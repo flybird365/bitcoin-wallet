@@ -31,22 +31,21 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.preference.PreferenceManager;
 import android.text.Spannable;
-import android.text.SpannableString;
-import android.text.SpannableStringBuilder;
 import android.text.style.ForegroundColorSpan;
-import android.text.style.RelativeSizeSpan;
 import android.view.View;
 import android.widget.RemoteViews;
 
 import com.google.bitcoin.core.Coin;
 import com.google.bitcoin.core.Wallet;
 import com.google.bitcoin.core.Wallet.BalanceType;
+import com.google.bitcoin.utils.MonetaryFormat;
 
 import de.schildbach.wallet.ExchangeRatesProvider.ExchangeRate;
 import de.schildbach.wallet.ui.RequestCoinsActivity;
 import de.schildbach.wallet.ui.SendCoinsQrActivity;
 import de.schildbach.wallet.ui.WalletActivity;
 import de.schildbach.wallet.ui.send.SendCoinsActivity;
+import de.schildbach.wallet.util.CoinSpannable;
 import de.schildbach.wallet.util.GenericUtils;
 import de.schildbach.wallet.util.WalletUtils;
 import de.schildbach.wallet_test.R;
@@ -98,21 +97,17 @@ public class WalletBalanceWidgetProvider extends AppWidgetProvider
 
 		final Cursor data = context.getContentResolver().query(ExchangeRatesProvider.contentUri(context.getPackageName(), true), null,
 				ExchangeRatesProvider.KEY_CURRENCY_CODE, new String[] { config.getExchangeCurrencyCode() }, null);
-		final SpannableStringBuilder localBalanceStr;
+		final Spannable localBalanceStr;
 		if (data != null)
 		{
 			if (data.moveToFirst())
 			{
 				final ExchangeRate exchangeRate = ExchangeRatesProvider.getExchangeRate(data);
 				final Coin localBalance = WalletUtils.localValue(balance, exchangeRate.rate);
-				localBalanceStr = new SpannableStringBuilder(GenericUtils.formatValue(localBalance, Constants.LOCAL_PRECISION, 0));
-				WalletUtils.formatSignificant(localBalanceStr, new RelativeSizeSpan(0.85f));
-				final String prefix = Constants.PREFIX_ALMOST_EQUAL_TO + GenericUtils.currencySymbol(exchangeRate.currencyCode)
-						+ Constants.CHAR_THIN_SPACE;
-				localBalanceStr.insert(0, prefix);
-				localBalanceStr.setSpan(new RelativeSizeSpan(0.85f), 0, prefix.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-				localBalanceStr.setSpan(new ForegroundColorSpan(context.getResources().getColor(R.color.fg_less_significant)), 0, prefix.length(),
-						Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+				final MonetaryFormat localFormat = Constants.LOCAL_FORMAT.code(0,
+						Constants.PREFIX_ALMOST_EQUAL_TO + GenericUtils.currencySymbol(exchangeRate.currencyCode));
+				localBalanceStr = new CoinSpannable(localFormat, localBalance).applyMarkup(CoinSpannable.SMALLER_SPAN, new ForegroundColorSpan(
+						context.getResources().getColor(R.color.fg_less_significant)), CoinSpannable.SMALLER_SPAN);
 			}
 			else
 			{
@@ -126,19 +121,19 @@ public class WalletBalanceWidgetProvider extends AppWidgetProvider
 			localBalanceStr = null;
 		}
 
-		final Spannable balanceStr = new SpannableString(GenericUtils.formatValue(balance, config.getBtcPrecision(), config.getBtcShift()));
-		WalletUtils.formatSignificant(balanceStr, WalletUtils.SMALLER_SPAN);
+		final MonetaryFormat btcFormat = config.getFormat();
+		final Spannable balanceStr = new CoinSpannable(btcFormat.noCode(), balance).applyMarkup(null, null, CoinSpannable.SMALLER_SPAN);
 
 		for (final int appWidgetId : appWidgetIds)
 		{
 			final RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.wallet_balance_widget_content);
 
-			final String currencyCode = config.getBtcPrefix();
-			if (Constants.CURRENCY_CODE_BTC.equals(currencyCode))
+			final String currencyCode = btcFormat.code();
+			if (MonetaryFormat.CODE_BTC.equals(currencyCode))
 				views.setImageViewResource(R.id.widget_wallet_prefix, R.drawable.currency_symbol_btc);
-			else if (Constants.CURRENCY_CODE_MBTC.equals(currencyCode))
+			else if (MonetaryFormat.CODE_MBTC.equals(currencyCode))
 				views.setImageViewResource(R.id.widget_wallet_prefix, R.drawable.currency_symbol_mbtc);
-			else if (Constants.CURRENCY_CODE_UBTC.equals(currencyCode))
+			else if (MonetaryFormat.CODE_UBTC.equals(currencyCode))
 				views.setImageViewResource(R.id.widget_wallet_prefix, R.drawable.currency_symbol_ubtc);
 
 			views.setTextViewText(R.id.widget_wallet_balance_btc, balanceStr);
