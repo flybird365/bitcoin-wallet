@@ -53,6 +53,7 @@ import com.google.bitcoin.protocols.payments.PaymentProtocolException;
 import com.google.bitcoin.protocols.payments.PaymentSession;
 import com.google.bitcoin.uri.BitcoinURI;
 import com.google.bitcoin.uri.BitcoinURIParseException;
+import com.google.common.hash.Hashing;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.UninitializedMessageException;
 
@@ -390,8 +391,10 @@ public abstract class InputParser
 
 			final byte[] merchantData = paymentSession.getMerchantData();
 
+			final byte[] paymentRequestHash = Hashing.sha256().hashBytes(serializedPaymentRequest).asBytes();
+
 			final PaymentIntent paymentIntent = new PaymentIntent(PaymentIntent.Standard.BIP70, pkiName, pkiCaName,
-					outputs.toArray(new PaymentIntent.Output[0]), memo, paymentUrl, merchantData, null);
+					outputs.toArray(new PaymentIntent.Output[0]), memo, paymentUrl, merchantData, null, paymentRequestHash);
 
 			if (paymentIntent.hasPaymentUrl() && !paymentIntent.isSupportedPaymentUrl())
 				throw new PaymentProtocolException.InvalidPaymentURL("cannot handle payment url: " + paymentIntent.paymentUrl);
